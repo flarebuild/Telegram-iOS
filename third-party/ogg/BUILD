@@ -8,6 +8,7 @@ objc_library(
     ]),
     hdrs = glob([
         "include/ogg/*.h",
+        "Sources/*.h",
     ]),
     includes = [
         "include",

@@ -8,6 +8,7 @@ objc_library(
     ]),
     hdrs = glob([
         "include/opusfile/*.h",
+        "Sources/*.h",
     ]),
     includes = [
         "include",
