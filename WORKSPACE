@@ -56,3 +56,16 @@ http_file(
     urls = ["https://github.com/Kitware/CMake/releases/download/v3.19.2/cmake-3.19.2-macos-universal.tar.gz"],
     sha256 = "50afa2cb66bea6a0314ef28034f3ff1647325e30cf5940f97906a56fd9640bd8",
 )
+
+
+flare_toolchains_commit = "d8abaa1e97d8e9fbbdd6431a1a7f71c48ccce5a7"
+flare_toolchains_sha256 = "cddad6c5e480699e8f7baeaa381924a4c7509bb9a7c8c1288a2658745d665bed"
+http_archive(
+    name = "flare_toolchains",
+    sha256 = flare_toolchains_sha256,
+    strip_prefix = "flare-toolchains-" + flare_toolchains_commit,
+    urls = [
+        "https://github.com/flarebuild/flare-toolchains/archive/" + flare_toolchains_commit + ".tar.gz",
+    ],
+)
+

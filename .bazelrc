@@ -28,14 +28,14 @@ build:remote --jobs=50
 build:remote --remote_timeout=300
 build:remote --java_runtime_version=rbe_jdk
 build:remote --tool_java_runtime_version=rbe_jdk
-build:remote --extra_toolchains=//build-system/osx-remote-toolchain/java:all
+build:remote --extra_toolchains=@flare_toolchains//osx/java:all
 
-build:remote --crosstool_top=//build-system/osx-remote-toolchain/cc:toolchain
+build:remote --crosstool_top=@flare_toolchains//osx/cc:toolchain
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote --extra_toolchains=//build-system/osx-remote-toolchain/config:cc-toolchain
-build:remote --apple_crosstool_top=//build-system/osx-remote-toolchain/cc:toolchain
+build:remote --extra_toolchains=@flare_toolchains//osx/config:cc-toolchain
+build:remote --apple_crosstool_top=@flare_toolchains//osx/cc:toolchain
 
-build:remote --extra_execution_platforms=//build-system/osx-remote-toolchain/config:platform
-build:remote --host_platform=//build-system/osx-remote-toolchain/config:platform
-build:remote --platforms=//build-system/osx-remote-toolchain/config:platform
+build:remote --extra_execution_platforms=@flare_toolchains//osx/config:platform
+build:remote --host_platform=@flare_toolchains//osx/config:platform
+build:remote --platforms=@flare_toolchains//osx/config:platform
 

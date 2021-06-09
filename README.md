@@ -108,7 +108,7 @@ bazel-bin/src/tools/remote/worker \
     shell2: /tmp/bb-worker$ ./bb_worker worker.jsonnet 
     ```
 
-## Run build with RBE
+## Run build with local RBE (Tilt or Bazel remote)
 
 This command will build Telegram iOS app with RBE in Tilt
 
@@ -130,3 +130,23 @@ bazel build Telegram/Telegram \
 
 To build with Bazel remote worker, change the last line to `--remote_executor=grpc://localhost:8080 --remote_cache=grpc://localhost:8080`
 
+## Run build with flare stg
+
+```bash
+bazel build Telegram/Telegram \
+--override_repository=build_configuration=`pwd`/build-system/example-configuration \
+--announce_rc --features=swift.use_global_module_cache \
+--features=swift.skip_function_bodies_for_derived_files \
+--define=buildNumber=100001 --define=telegramVersion=7.7 \
+--features=swift.split_derived_files_generation \
+-c opt --apple_generate_dsym --output_groups=+dsyms --features=swift.opt_uses_wmo \
+--features=swift.opt_uses_osize --swiftcopt=-num-threads --swiftcopt=0 \
+--features=dead_strip --objc_enable_binary_stripping --apple_bitcode=watchos=embedded \
+--//Telegram:disableProvisioningProfiles=true \
+--verbose_failures --subcommands=pretty_print \
+--config=remote \
+--remote_header=x-flare-builduser=telegram \
+--bes_results_url=https://insights.stg.flare.build/invocations/ \
+--bes_backend=bes.stg.flare.build \
+--remote_executor=proxy.stg.flare.build --google_default_credentials
+```
