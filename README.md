@@ -1,108 +1,132 @@
-# Telegram iOS Source Code Compilation Guide
+# fork to test bazel remote execution for iOS app
 
-We welcome all developers to use our API and source code to create applications on our platform.
-There are several things we require from **all developers** for the moment.
+[Original README](README-original.md)
 
-# Creating your Telegram Application
+## How to prepare RBE with Bazel remote worker
 
-1. [**Obtain your own api_id**](https://core.telegram.org/api/obtaining_api_id) for your application.
-2. Please **do not** use the name Telegram for your app — or make sure your users understand that it is unofficial.
-3. Kindly **do not** use our standard logo (white paper plane in a blue circle) as your app's logo.
-3. Please study our [**security guidelines**](https://core.telegram.org/mtproto/security_guidelines) and take good care of your users' data and privacy.
-4. Please remember to publish **your** code too in order to comply with the licences.
-
-# Compilation Guide
-
-1. Install Xcode (directly from https://developer.apple.com/download/more or using the App Store).
-2. Clone the project from GitHub:
-
-```
-git clone --recursive -j8 https://github.com/TelegramMessenger/Telegram-iOS.git
+```bash
+git clone https://github.com/bazelbuild/bazel.git
+cd bazel
+bazel build src/tools/remote:all
+bazel-bin/src/tools/remote/worker \
+  --work_path=/tmp/test/wp \
+  --cas_path=/tmp/test/cas \
+  --listen_port=8080
 ```
 
-3. Download Bazel 4.0.0
+## How to prepare RBE with Flare
 
+1. Start Tilt in flare repo
+
+2. Prepare worker directory
+   ```bash
+   mkdir -p /tmp/worker/worker/{build,cache}
+   ```
+
+3. Build buildbarn runner and worker
+    ```bash
+    git clone https://github.com/buildbarn/bb-remote-execution.git
+    cd bb-remote-execution
+    bazel build cmd/bb_worker:bb_worker cmd/bb_runner:bb_runner
+    ```
+    Copy bb_worker and bb_runner binaries to /tmp/worker
+
+4. Create configuration files
+
+    ```
+    /tmp/bb-worker$ cat common.libsonnet
+    local lbGrpc = {
+      address: "localhost:8002",
+      addMetadata: [
+        {
+          header: "x-api-key",
+          values: ["local_flare"],
+        },
+      ],
+    };
+    {
+      browserUrl: "example.com",
+      blobstore: {
+        contentAddressableStorage: {
+          grpc: lbGrpc,
+        },
+        actionCache: {
+          grpc: lbGrpc,
+        },
+      },
+      maximumMessageSizeBytes: 16 * 1024 * 1024,
+    }
+    ```
+    
+    ```
+    /tmp/bb-worker$ cat runner.jsonnet
+    {
+      buildDirectoryPath: '/tmp/bb-worker/worker/build',
+      grpcServers: [{
+        listenPaths: ['/tmp/bb-worker/worker/runner'],
+        authenticationPolicy: { allow: {} },
+      }],
+    }
+    ```
+    
+    ```
+    /tmp/bb-worker$ cat worker.jsonnet
+    local common = import 'common.libsonnet';
+    
+    {
+      blobstore: common.blobstore,
+      maximumMessageSizeBytes: common.maximumMessageSizeBytes,
+      scheduler: { address: 'localhost:8012' },
+      maximumMemoryCachedDirectories: 1000,
+      instanceName: '',
+      buildDirectories: [{
+        native: {
+          buildDirectoryPath: '/tmp/bb-worker/worker/build',
+          cacheDirectoryPath: '/tmp/bb-worker/worker/cache',
+          maximumCacheFileCount: 10000,
+          maximumCacheSizeBytes: 1024 * 1024 * 1024,
+          cacheReplacementPolicy: 'LEAST_RECENTLY_USED',
+        },
+        runners: [{
+          endpoint: { address: 'unix:///tmp/bb-worker/worker/runner' },
+          concurrency: 16,
+          platform: {
+            properties: [
+              { name: 'OSFamily', value: 'MacOS' },
+            ],
+          },
+          defaultExecutionTimeout: '1800s',
+          maximumExecutionTimeout: '3600s',
+        }],
+      }],
+    }
+    ```
+
+5. Start runner and worker (in separate shells)
+    ```bash
+    shell1: /tmp/bb-worker$ ./bb_runner runner.jsonnet
+    shell2: /tmp/bb-worker$ ./bb_worker worker.jsonnet 
+    ```
+
+## Run build with RBE
+
+This command will build Telegram iOS app with RBE in Tilt
+
+```bash
+bazel build Telegram/Telegram \
+--override_repository=build_configuration=`pwd`/build-system/example-configuration \
+--announce_rc --features=swift.use_global_module_cache \
+--features=swift.skip_function_bodies_for_derived_files \
+--define=buildNumber=100001 --define=telegramVersion=7.7 \
+--features=swift.split_derived_files_generation \
+-c opt --apple_generate_dsym --output_groups=+dsyms --features=swift.opt_uses_wmo \
+--features=swift.opt_uses_osize --swiftcopt=-num-threads --swiftcopt=0 \
+--features=dead_strip --objc_enable_binary_stripping --apple_bitcode=watchos=embedded \
+--//Telegram:disableProvisioningProfiles=true \
+--verbose_failures --subcommands=pretty_print \
+--config=remote \
+--remote_executor=grpc://localhost:8002 --remote_header=x-api-key=local_flare
 ```
-mkdir -p $HOME/bazel-dist
-cd $HOME/bazel-dist
-curl -O -L https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-darwin-x86_64
-mv bazel-* bazel
-```
 
-Verify that it's working
+To build with Bazel remote worker, change the last line to `--remote_executor=grpc://localhost:8080 --remote_cache=grpc://localhost:8080`
 
-```
-chmod +x bazel
-./bazel --version
-```
-
-4. Adjust configuration parameters
-
-```
-mkdir -p $HOME/telegram-configuration
-cp -R build-system/example-configuration/* $HOME/telegram-configuration/
-```
-
-- Modify the values in `variables.bzl`
-- Replace the provisioning profiles in `provisioning` with valid files
-
-5. (Optional) Create a build cache directory to speed up rebuilds
-
-```
-mkdir -p "$HOME/telegram-bazel-cache"
-```
-
-5. Build the app
-
-```
-python3 build-system/Make/Make.py \
-    --bazel="$HOME/bazel-dist/bazel" \
-    --cacheDir="$HOME/telegram-bazel-cache" \
-    build \
-    --configurationPath="$HOME/telegram-configuration" \
-    --buildNumber=100001 \
-    --configuration=release_universal
-```
-
-6. (Optional) Generate an Xcode project
-
-```
-python3 build-system/Make/Make.py \
-    --bazel="$HOME/bazel-dist/bazel" \
-    --cacheDir="$HOME/telegram-bazel-cache" \
-    generateProject \
-    --configurationPath="$HOME/telegram-configuration" \
-    --disableExtensions
-```
-
-It is possible to generate a project that does not require any codesigning certificates to be installed: add `--disableProvisioningProfiles` flag:
-```
-python3 build-system/Make/Make.py \
-    --bazel="$HOME/bazel-dist/bazel" \
-    --cacheDir="$HOME/telegram-bazel-cache" \
-    generateProject \
-    --configurationPath="$HOME/telegram-configuration" \
-    --disableExtensions \
-    --disableProvisioningProfiles
-```
-
-
-Tip: use `--disableExtensions` when developing to speed up development by not building application extensions and the WatchOS app.
-
-
-# Tips
-
-Bazel is used to build the app. To simplify the development setup a helper script is provided (`build-system/Make/Make.py`). See help:
-
-```
-python3 build-system/Make/Make.py --help
-python3 build-system/Make/Make.py build --help
-python3 build-system/Make/Make.py generateProject --help
-```
-
-Each release is built using specific Xcode and Bazel versions (see `versions.json`). The helper script checks the versions of installed software and reports an error if they don't match the ones specified in `versions.json`. There are flags that allow to bypass these checks:
-
-```
-python3 build-system/Make/Make.py --overrideBazelVersion build ... # Don't check the version of Bazel
-python3 build-system/Make/Make.py --overrideXcodeVersion build ... # Don't check the version of Xcode
-```

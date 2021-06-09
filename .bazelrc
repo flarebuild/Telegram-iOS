@@ -25,18 +25,17 @@ build --strategy_regexp=Linking.*Swift=remote
 build --define RULES_SWIFT_BUILD_DUMMY_WORKER=1
 
 build:remote --jobs=50
-
+build:remote --remote_timeout=300
 build:remote --java_runtime_version=rbe_jdk
 build:remote --tool_java_runtime_version=rbe_jdk
-build:remote --extra_toolchains=@rbe_default//java:all
+build:remote --extra_toolchains=//build-system/osx-remote-toolchain/java:all
 
-build:remote --crosstool_top=@rbe_default//cc:toolchain
+build:remote --crosstool_top=//build-system/osx-remote-toolchain/cc:toolchain
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote --extra_toolchains=@rbe_default//config:cc-toolchain
+build:remote --extra_toolchains=//build-system/osx-remote-toolchain/config:cc-toolchain
+build:remote --apple_crosstool_top=//build-system/osx-remote-toolchain/cc:toolchain
 
-build:remote --extra_execution_platforms=@rbe_default//config:platform
-build:remote --host_platform=@rbe_default//config:platform
-build:remote --platforms=@rbe_default//config:platform
-
-build:remote --remote_timeout=300
+build:remote --extra_execution_platforms=//build-system/osx-remote-toolchain/config:platform
+build:remote --host_platform=//build-system/osx-remote-toolchain/config:platform
+build:remote --platforms=//build-system/osx-remote-toolchain/config:platform
 
