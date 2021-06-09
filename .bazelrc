@@ -38,4 +38,4 @@ build:remote --apple_crosstool_top=@flare_toolchains//osx/cc:toolchain
 build:remote --extra_execution_platforms=@flare_toolchains//osx/config:platform
 build:remote --host_platform=@flare_toolchains//osx/config:platform
 build:remote --platforms=@flare_toolchains//osx/config:platform
-
+build:remote --action_env=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
